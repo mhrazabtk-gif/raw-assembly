@@ -13,7 +13,7 @@ const SITEMAP_FILE = path.join(PUBLIC_DIR, 'sitemap.xml');
 const KEY_FILE = path.join(PUBLIC_DIR, `${KEY}.txt`);
 
 if (!fs.existsSync(URLS_FILE)) {
-  throw new Error('urls.txt is missing. Sitemap generation stopped.');
+  throw new Error('urls.txt is missing. Deployment stopped.');
 }
 
 if (!fs.existsSync(REDIRECTS_FILE)) {
@@ -25,7 +25,7 @@ const redirectRules = fs.readFileSync(REDIRECTS_FILE, 'utf8')
   .filter(line => line.trim() && !line.trim().startsWith('#'));
 
 if (redirectRules.length > 2000) {
-  throw new Error(`Redirect rule check failed: ${redirectRules.length} rules.`);
+  throw new Error(`Redirect validation failed: ${redirectRules.length} rules.`);
 }
 
 const inputUrls = fs.readFileSync(URLS_FILE, 'utf8')
@@ -44,18 +44,26 @@ for (const value of inputUrls) {
     throw new Error(`Invalid URL in urls.txt: ${value}`);
   }
 
-  if (url.origin !== DOMAIN) {
-    throw new Error(`Unexpected URL domain: ${value}`);
+  if (
+    url.hostname.toLowerCase() !== 'raw-assembly.pages.dev' ||
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username ||
+    url.password
+  ) {
+    throw new Error(`Unexpected URL in urls.txt: ${value}`);
   }
 
-  // Remove duplicate slashes from the pathname only.
+  // Use HTTPS consistently in the sitemap.
+  url.protocol = 'https:';
+
+  // Normalize duplicate slashes in the pathname.
   url.pathname = '/' + url.pathname.split('/').filter(Boolean).join('/');
 
   urls.add(url.href);
 }
 
 if (urls.size === 0) {
-  throw new Error('No valid URLs found. Sitemap generation stopped.');
+  throw new Error('No valid URLs found. Deployment stopped.');
 }
 
 const lastmod = new Date().toISOString();
@@ -84,18 +92,21 @@ xml += '</urlset>\n';
 
 fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 
-// Only update the generated sitemap and IndexNow key.
-// Do not modify or regenerate public/_redirects.
+// Update only generated files. Never rewrite or delete _redirects.
 fs.writeFileSync(SITEMAP_FILE, xml, 'utf8');
 fs.writeFileSync(KEY_FILE, KEY, 'utf8');
 
-// Verify the redirect file still exists after generation.
+// Final safety checks before deployment.
 if (!fs.existsSync(REDIRECTS_FILE)) {
-  throw new Error('Redirect file disappeared during generation.');
+  throw new Error('_redirects disappeared. Deployment stopped.');
+}
+
+if (!fs.existsSync(SITEMAP_FILE) || !fs.existsSync(KEY_FILE)) {
+  throw new Error('Sitemap or IndexNow key file is missing.');
 }
 
 console.log(`Sitemap URLs: ${urls.size}`);
 console.log(`lastmod: ${lastmod}`);
 console.log('changefreq: hourly');
 console.log(`Redirect rules preserved: ${redirectRules.length}`);
-console.log('IndexNow verification file generated.');
+console.log('Build validation passed.');
