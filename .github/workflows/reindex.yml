@@ -1,3 +1,4 @@
+
 name: Hourly Site Re-indexing
 
 on:
@@ -5,9 +6,17 @@ on:
     - cron: '0 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: raw-assembly-deployment
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -17,14 +26,48 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run Sitemap Builder
+      - name: Verify source files
+        shell: bash
+        run: |
+          test -f urls.txt || {
+            echo "ERROR: urls.txt missing"
+            exit 1
+          }
+
+          test -f public/_redirects || {
+            echo "ERROR: public/_redirects missing; deployment stopped"
+            exit 1
+          }
+
+      - name: Generate Sitemap and IndexNow Key
         run: node build-sitemap.js
 
-      - name: Run IndexNow Ping
-        run: node ping-indexnow.js
+      - name: Validate deployment files
+        shell: bash
+        run: |
+          test -s public/sitemap.xml
+          test -s public/_redirects
+          test -s public/c2505c58b8164384989bd0b8a446fa5d.txt
+
+          grep -q '<lastmod>' public/sitemap.xml
+          grep -q '<changefreq>hourly</changefreq>' public/sitemap.xml
+
+          REDIRECT_COUNT=$(grep -cEv '^[[:space:]]*(#.*)?$' public/_redirects || true)
+
+          if [ "$REDIRECT_COUNT" -gt 2000 ]; then
+            echo "ERROR: More than 2000 redirect rules found"
+            exit 1
+          fi
+
+          echo "Sitemap validation passed."
+          echo "Redirect rules: $REDIRECT_COUNT"
 
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler pages deploy public --project-name=raw-assembly --commit-dirty=true
+        run: npx wrangler pages deploy public --project-name=raw-assembly --branch=main
+
+      - name: Run IndexNow Ping
+        if: success()
+        run: node ping-indexnow.js
