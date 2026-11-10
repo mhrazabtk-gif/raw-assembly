@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const DOMAIN = 'https://raw-assembly.pages.dev';
+const DOMAIN = 'https://raw-assembly.pageaura.xyz';
 const KEY = 'c2505c58b8164384989bd0b8a446fa5d';
 
 const ROOT = __dirname;
@@ -45,7 +45,7 @@ for (const value of inputUrls) {
   }
 
   if (
-    url.hostname.toLowerCase() !== 'raw-assembly.pages.dev' ||
+    url.hostname.toLowerCase() !== 'raw-assembly.pageaura.xyz' ||
     !['http:', 'https:'].includes(url.protocol) ||
     url.username ||
     url.password
