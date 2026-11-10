@@ -2,9 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const HOST = 'raw-assembly.pages.dev';
+const HOST = 'raw-assembly.pageaura.xyz';
 const KEY = 'c2505c58b8164384989bd0b8a446fa5d'; // Replace with your IndexNow key string
-const KEY_LOCATION = `https://raw-assembly.pages.dev/c2505c58b8164384989bd0b8a446fa5d.txt`;
+const KEY_LOCATION = `https://raw-assembly.pageaura.xyz/c2505c58b8164384989bd0b8a446fa5d.txt`;
 
 const urlsFile = path.join(__dirname, 'urls.txt');
 let urlList = [];
